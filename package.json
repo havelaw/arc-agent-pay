@@ -1,0 +1,25 @@
+{
+  "name": "arc-agent-pay",
+  "version": "1.0.0",
+  "description": "AI Agent escrow payments on Arc testnet using ERC-8183",
+  "scripts": {
+    "compile": "hardhat compile",
+    "demo": "hardhat run scripts/deploy-local.ts",
+    "deploy:arc": "hardhat run scripts/deploy.ts --network arcTestnet"
+  },
+  "keywords": ["arc", "testnet", "ai-agent", "escrow", "erc-8183", "usdc"],
+  "author": "havelaw",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^7.0.0",
+    "@types/node": "^25.8.0",
+    "hardhat": "^3.4.5",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.16.0"
+  },
+  "type": "module"
+}
