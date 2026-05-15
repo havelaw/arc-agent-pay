@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arc Agent Pay — Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --accent: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .header .chain-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      background: rgba(59,130,246,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(59,130,246,0.3);
+      margin-top: 8px;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .card .value { font-size: 24px; font-weight: 700; }
+    .card .addr { font-size: 11px; color: var(--muted); word-break: break-all; margin-top: 4px; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .section-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .status { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+    .status-open { background: rgba(100,116,139,0.2); color: var(--muted); }
+    .status-funded { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .status-submitted { background: rgba(59,130,246,0.15); color: var(--accent); }
+    .status-completed { background: rgba(34,197,94,0.15); color: var(--green); }
+    .status-rejected { background: rgba(239,68,68,0.15); color: var(--red); }
+    .status-expired { background: rgba(100,116,139,0.2); color: var(--muted); }
+    .tx-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+    .tx-link:hover { text-decoration: underline; }
+    .create-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .form-row label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .form-row input, .form-row textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .form-row textarea { resize: vertical; min-height: 60px; }
+    .form-row .field { flex: 1; }
+    button {
+      padding: 10px 24px;
+      border-radius: 8px;
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-refresh { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-refresh:hover { border-color: var(--accent); }
+    .log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    .log-entry { padding: 4px 0; border-bottom: 1px solid rgba(30,30,46,0.5); }
+    .log-time { color: var(--muted); }
+    .log-msg { color: var(--text); }
+    .footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 32px; }
+    .footer a { color: var(--accent); text-decoration: none; }
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Arc Agent Pay</h1>
+  <p>AI Agent Escrow Payments — ERC-8183 on Arc Testnet</p>
+  <span class="chain-badge">Arc Testnet · Chain 5042002</span>
+</div>
+
+<!-- Agent Balances -->
+<div class="grid" id="balances">
+  <div class="card">
+    <h3>Client Agent</h3>
+    <div class="value" id="client-bal">—</div>
+    <div class="addr" id="client-addr"></div>
+  </div>
+  <div class="card">
+    <h3>Worker Agent</h3>
+    <div class="value" id="worker-bal">—</div>
+    <div class="addr" id="worker-addr"></div>
+  </div>
+  <div class="card">
+    <h3>Evaluator Agent</h3>
+    <div class="value" id="eval-bal">—</div>
+    <div class="addr" id="eval-addr"></div>
+  </div>
+</div>
+
+<!-- Contract Info -->
+<div class="grid" style="grid-template-columns: 1fr 1fr;">
+  <div class="card">
+    <h3>Escrow Contract</h3>
+    <div id="escrow-addr" style="font-size:12px; word-break:break-all;"></div>
+    <div style="margin-top:8px;">
+      <a class="tx-link" id="escrow-link" href="#" target="_blank">View on ArcScan ↗</a>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Total Jobs</h3>
+    <div class="value" id="job-count">—</div>
+    <div style="margin-top:8px;">
+      <button class="btn-refresh" onclick="refresh()">Refresh</button>
+      <span id="last-update" style="font-size:11px; color:var(--muted); margin-left:8px;"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Jobs Table -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span> Jobs</div>
+  <div class="card" style="padding:0; overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Task</th>
+          <th>Budget</th>
+          <th>Status</th>
+          <th>Client</th>
+          <th>Worker</th>
+          <th>Expires</th>
+        </tr>
+      </thead>
+      <tbody id="jobs-tbody">
+        <tr><td colspan="7" style="text-align:center; color:var(--muted);">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Event Log -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span> Live Event Log</div>
+  <div class="log" id="event-log">
+    <div class="log-entry"><span class="log-time">—</span> <span class="log-msg">Connecting to Arc testnet...</span></div>
+  </div>
+</div>
+
+<!-- Create Job Form -->
+<div class="section">
+  <div class="section-title">Create New Job</div>
+  <div class="create-form">
+    <div class="form-row">
+      <div class="field">
+        <label>Task Description</label>
+        <textarea id="form-task" placeholder="Analyze BTC/USDC 4H chart: support/resistance, entry/SL/TP"></textarea>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Budget (USDC)</label>
+        <input type="text" id="form-budget" value="0.5" />
+      </div>
+      <div class="field">
+        <label>Worker Address</label>
+        <input type="text" id="form-worker" />
+      </div>
+      <div class="field">
+        <label>Evaluator Address</label>
+        <input type="text" id="form-evaluator" />
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="btn-primary" id="btn-create" onclick="createJob()" disabled>Connect Wallet to Create</button>
+      <button class="btn-refresh" onclick="connectWallet()">Connect MetaMask</button>
+      <span id="wallet-status" style="font-size:11px; color:var(--muted);"></span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="https://github.com/havelaw/arc-agent-pay" target="_blank">GitHub</a> ·
+  <a href="https://testnet.arcscan.app" target="_blank">ArcScan</a> ·
+  <a href="https://docs.arc.io" target="_blank">Arc Docs</a> ·
+  Built with ERC-8183 on Arc Chain
+</div>
+
+<script>
+const CONFIG = {
+  rpc: "https://rpc.testnet.arc.network",
+  chainId: 5042002,
+  explorer: "https://testnet.arcscan.app",
+  escrow: "0x936083B0cA386f74E60405B551418f78247DdFd3",
+  agents: {
+    client:    "0xd9Ae1876154a541A45ad623bE0E9106DC296d091",
+    worker:    "0xE717b1107C640A9273667Fd6d7566D7B9Eed87e0",
+    evaluator: "0xaa69e9e4E32D5Ca2Ae6378d9D85a8d5d63BF92E4",
+  },
+};
+
+const ABI = [
+  "function jobCount() view returns (uint256)",
+  "function getJob(uint256) view returns (address client, address provider, address evaluator, string description, uint256 budget, uint256 expiredAt, uint8 status, bytes32 deliverable, bytes32 reason)",
+  "function createJob(address provider, address evaluator, uint256 budget, uint256 expiredAt, string description) returns (uint256)",
+  "function fund(uint256 jobId) payable",
+  "event JobCreated(uint256 indexed jobId, address indexed client, address provider, address evaluator, uint256 budget, uint256 expiredAt, string description)",
+  "event JobFunded(uint256 indexed jobId, uint256 amount)",
+  "event JobSubmitted(uint256 indexed jobId, bytes32 deliverable)",
+  "event JobCompleted(uint256 indexed jobId, bytes32 reason, uint256 payout)",
+  "event JobRejected(uint256 indexed jobId, bytes32 reason)",
+  "event Refunded(uint256 indexed jobId, uint256 amount)",
+];
+
+const STATUS_NAMES = ["Open", "Funded", "Submitted", "Completed", "Rejected", "Expired"];
+const STATUS_CLASSES = ["open", "funded", "submitted", "completed", "rejected", "expired"];
+
+const provider = new ethers.JsonRpcProvider(CONFIG.rpc, CONFIG.chainId);
+const escrow = new ethers.Contract(CONFIG.escrow, ABI, provider);
+let signer = null;
+let lastPollBlock = 0;
+
+function shortAddr(a) { return a.slice(0, 6) + "..." + a.slice(-4); }
+function formatUSDC(wei) { return parseFloat(ethers.formatEther(wei)).toFixed(4); }
+function timeAgo(ts) {
+  const diff = Math.floor(Date.now() / 1000) - Number(ts);
+  if (diff < 0) return "in " + Math.abs(diff) + "s";
+  if (diff < 60) return diff + "s ago";
+  if (diff < 3600) return Math.floor(diff/60) + "m ago";
+  if (diff < 86400) return Math.floor(diff/3600) + "h ago";
+  return Math.floor(diff/86400) + "d ago";
+}
+
+function addLog(msg) {
+  const log = document.getElementById("event-log");
+  const time = new Date().toLocaleTimeString();
+  const entry = document.createElement("div");
+  entry.className = "log-entry";
+  entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-msg">${msg}</span>`;
+  log.prepend(entry);
+  if (log.children.length > 50) log.lastChild.remove();
+}
+
+async function loadBalances() {
+  for (const [role, addr] of Object.entries(CONFIG.agents)) {
+    const bal = await provider.getBalance(addr);
+    document.getElementById(`${role === "evaluator" ? "eval" : role}-bal`).textContent = formatUSDC(bal) + " USDC";
+    document.getElementById(`${role === "evaluator" ? "eval" : role}-addr`).textContent = addr;
+  }
+}
+
+async function loadJobs() {
+  const count = await escrow.jobCount();
+  document.getElementById("job-count").textContent = count.toString();
+
+  const tbody = document.getElementById("jobs-tbody");
+  if (count === 0n) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--muted);">No jobs yet</td></tr>';
+    return;
+  }
+
+  let rows = "";
+  for (let i = Number(count) - 1; i >= 0 && i >= Number(count) - 20; i--) {
+    const job = await escrow.getJob(i);
+    const status = Number(job[6]);
+    const expiry = Number(job[5]);
+    const now = Math.floor(Date.now() / 1000);
+    const expiryText = expiry > now ? timeAgo(now - (expiry - now)) : "expired";
+
+    rows += `<tr>
+      <td>#${i}</td>
+      <td title="${job[3]}">${job[3].length > 50 ? job[3].substring(0, 50) + "..." : job[3]}</td>
+      <td>${formatUSDC(job[4])} USDC</td>
+      <td><span class="status status-${STATUS_CLASSES[status]}">${STATUS_NAMES[status]}</span></td>
+      <td><a class="tx-link" href="${CONFIG.explorer}/address/${job[0]}" target="_blank">${shortAddr(job[0])}</a></td>
+      <td><a class="tx-link" href="${CONFIG.explorer}/address/${job[1]}" target="_blank">${shortAddr(job[1])}</a></td>
+      <td>${expiryText}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = rows;
+}
+
+async function refresh() {
+  addLog("Refreshing data...");
+  document.getElementById("last-update").textContent = "updating...";
+  try {
+    await Promise.all([loadBalances(), loadJobs()]);
+    document.getElementById("last-update").textContent = "updated " + new Date().toLocaleTimeString();
+    addLog("Data refreshed");
+  } catch (e) {
+    addLog("Error: " + e.message);
+  }
+}
+
+async function pollEvents() {
+  try {
+    const current = await provider.getBlockNumber();
+    if (current <= lastPollBlock) return;
+
+    const logs = await provider.getLogs({
+      address: CONFIG.escrow,
+      fromBlock: lastPollBlock + 1,
+      toBlock: current,
+    });
+
+    for (const log of logs) {
+      try {
+        const parsed = escrow.interface.parseLog({ topics: log.topics, data: log.data });
+        if (!parsed) continue;
+        const jid = parsed.args[0]?.toString();
+        switch (parsed.name) {
+          case "JobCreated":
+            addLog(`Job #${jid} created — ${formatUSDC(parsed.args[4])} USDC`);
+            break;
+          case "JobFunded":
+            addLog(`Job #${jid} funded — ${formatUSDC(parsed.args[1])} USDC deposited`);
+            break;
+          case "JobSubmitted":
+            addLog(`Job #${jid} — worker submitted deliverable`);
+            break;
+          case "JobCompleted":
+            addLog(`<span style="color:var(--green)">Job #${jid} COMPLETED</span> — ${formatUSDC(parsed.args[2])} USDC paid`);
+            break;
+          case "JobRejected":
+            addLog(`<span style="color:var(--red)">Job #${jid} REJECTED</span> — funds refunded`);
+            break;
+          case "Refunded":
+            addLog(`Job #${jid} expired — ${formatUSDC(parsed.args[1])} USDC refunded`);
+            break;
+        }
+      } catch {}
+    }
+
+    if (logs.length > 0) {
+      await Promise.all([loadBalances(), loadJobs()]);
+    }
+    lastPollBlock = current;
+  } catch {}
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("MetaMask not found. Install MetaMask to create jobs.");
+    return;
+  }
+
+  try {
+    await window.ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: "0x" + CONFIG.chainId.toString(16),
+        chainName: "Arc Testnet",
+        nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+        rpcUrls: [CONFIG.rpc],
+        blockExplorerUrls: [CONFIG.explorer],
+      }],
+    });
+
+    const browserProvider = new ethers.BrowserProvider(window.ethereum);
+    signer = await browserProvider.getSigner();
+    const addr = await signer.getAddress();
+    document.getElementById("wallet-status").textContent = "Connected: " + shortAddr(addr);
+    document.getElementById("btn-create").disabled = false;
+    document.getElementById("btn-create").textContent = "Create & Fund Job";
+    addLog("Wallet connected: " + shortAddr(addr));
+  } catch (e) {
+    addLog("Wallet error: " + e.message);
+  }
+}
+
+async function createJob() {
+  if (!signer) return;
+
+  const task = document.getElementById("form-task").value;
+  const budgetStr = document.getElementById("form-budget").value;
+  const workerAddr = document.getElementById("form-worker").value;
+  const evalAddr = document.getElementById("form-evaluator").value;
+
+  if (!task || !budgetStr || !workerAddr || !evalAddr) {
+    alert("Fill in all fields");
+    return;
+  }
+
+  const btn = document.getElementById("btn-create");
+  btn.disabled = true;
+  btn.textContent = "Creating...";
+
+  try {
+    const budget = ethers.parseEther(budgetStr);
+    const block = await provider.getBlock("latest");
+    const expiry = BigInt(block.timestamp) + 86400n;
+
+    const escrowSigned = new ethers.Contract(CONFIG.escrow, ABI, signer);
+
+    addLog("Creating job...");
+    const tx1 = await escrowSigned.createJob(workerAddr, evalAddr, budget, expiry, task);
+    await tx1.wait();
+    addLog("Job created! Funding...");
+
+    const jobId = (await escrow.jobCount()) - 1n;
+    const tx2 = await escrowSigned.fund(jobId, { value: budget });
+    await tx2.wait();
+    addLog(`Job #${jobId} created and funded with ${budgetStr} USDC!`);
+
+    await refresh();
+  } catch (e) {
+    addLog("Error: " + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Create & Fund Job";
+}
+
+// Init
+(async function init() {
+  document.getElementById("escrow-addr").textContent = CONFIG.escrow;
+  document.getElementById("escrow-link").href = CONFIG.explorer + "/address/" + CONFIG.escrow;
+  document.getElementById("form-worker").value = CONFIG.agents.worker;
+  document.getElementById("form-evaluator").value = CONFIG.agents.evaluator;
+
+  lastPollBlock = await provider.getBlockNumber();
+  addLog("Connected to Arc testnet (block " + lastPollBlock + ")");
+  await refresh();
+
+  // Poll every 5s
+  setInterval(pollEvents, 5000);
+})();
+</script>
+
+</body>
+</html>
