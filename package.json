@@ -7,7 +7,12 @@
     "demo": "hardhat run scripts/deploy-local.ts",
     "demo:full": "hardhat run scripts/demo-full.ts",
     "deploy:arc": "hardhat run scripts/deploy.ts --network arcTestnet",
-    "wallets": "npx tsx scripts/generate-wallets.ts"
+    "wallets": "npx tsx scripts/generate-wallets.ts",
+    "deploy:pipeline": "hardhat run scripts/deploy-pipeline.ts --network arcTestnet",
+    "pipeline:run": "npx tsx scripts/agents/pipeline-run-all.ts",
+    "pipeline:client": "npx tsx scripts/agents/pipeline-client.ts",
+    "pipeline:worker": "npx tsx scripts/agents/pipeline-worker.ts",
+    "pipeline:evaluator": "npx tsx scripts/agents/pipeline-evaluator.ts"
   },
   "keywords": [
     "arc",
@@ -22,6 +27,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^7.0.0",
     "@types/node": "^25.8.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.6",
     "hardhat": "^3.4.5",
     "typescript": "^6.0.3"
   },

@@ -1,52 +1,92 @@
 # arc-agent-pay
 
-AI Agent escrow payments on Arc testnet, built on [ERC-8183](https://eips.ethereum.org/EIPS/eip-8183) (Agentic Commerce Protocol).
+AI agents that work, evaluate, and get paid — fully autonomous, fully on-chain.
 
-Agents create jobs, fund them with USDC, submit deliverables, and get paid — all on-chain. An AI evaluator (Claude) validates work quality before releasing funds.
+Built on [ERC-8183](https://eips.ethereum.org/EIPS/eip-8183) (Agentic Commerce Protocol) on Arc testnet. No humans in the loop.
 
-**[Live Dashboard](https://arc-agent-pay.vercel.app)** · **[Escrow Contract on ArcScan](https://testnet.arcscan.app/address/0x936083B0cA386f74E60405B551418f78247DdFd3)**
+**[Live Dashboard](https://arc-agent-pay.vercel.app)** · **[Escrow Contract](https://testnet.arcscan.app/address/0x936083B0cA386f74E60405B551418f78247DdFd3)** · **[Pipeline Contract](https://testnet.arcscan.app/address/0x3C789996743e456C73ab1110ab1A36E11deBA0eb)**
 
-## How it works
+## What this does
 
 ```
-Client Agent  ──createJob + fund──►  AgentEscrow (on Arc)
-                                          │
-Worker Agent  ◄──watches for jobs─────────┘
-              ──submit(deliverableHash)──►
-                                          │
-AI Evaluator  ◄──reviews submission───────┘
-              ──complete() or reject()──►  USDC auto-settles
+┌──────────────────────────────────────────────────────────────────┐
+│                    AI Agent Payment System                        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  🧑‍💼 Client AI        ⚡ Worker AI         🧠 Evaluator AI       │
+│  Posts task +         Does the work &      Reviews quality       │
+│  locks payment        submits results      (powered by Claude)   │
+│       │                    │                     │               ��
+│       ▼                    ▼                     ▼               │
+│  ┌─────────────── On-Chain Escrow ───────────────────┐          │
+│  │  Pass → Worker gets paid                          │          │
+│  │  Fail → Client gets refunded                      │          │
+│  └───────────────────────────────────────────────────┘          │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### Job lifecycle (ERC-8183)
+### Two modes
 
-| Status | Description |
-|--------|-------------|
-| Open | Job created, not yet funded |
-| Funded | USDC deposited into escrow |
-| Submitted | Worker delivered result |
-| Completed | Evaluator approved → worker paid |
-| Rejected | Evaluator rejected → client refunded |
-| Expired | Deadline passed → client can claim refund |
+| Mode | Description | Contract |
+|------|-------------|----------|
+| **Single Job** | One task → one payment | AgentEscrowNative |
+| **Multi-Step Pipeline** | Chained tasks → step-by-step payment + gas compensation | AgentPipelineNative |
+
+### Pipeline example: BTC Analysis
+
+```
+Step 1                    Step 2                    Step 3
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│ Collect OHLCV   │ ───► │ Find Support/   │ ───► │ Trade           │
+│ data + compute  │      │ Resistance      │      │ Recommendation  │
+│ RSI, MACD, BB   │      │ levels          │      │ (entry/SL/TP)   │
+├─────────────────┤      ├─────────────────┤      ├─────────────────┤
+│ +0.55 USDC      │      │ +0.55 USDC      │      │ +1.10 USDC      │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+
+Each step's output feeds the next step's input.
+Worker earns reward + gas compensation per step.
+If any step fails → remaining budget refunded to client.
+```
 
 ## Live on Arc Testnet
 
-Contract deployed and verified with real transactions on Arc testnet (chain ID `5042002`).
+All contracts deployed with real transactions on Arc testnet (chain ID `5042002`).
 
-**Deployed Contract:** [`0x936083B0cA386f74E60405B551418f78247DdFd3`](https://testnet.arcscan.app/address/0x936083B0cA386f74E60405B551418f78247DdFd3)
+### Deployed Contracts
 
-### On-chain transactions
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| AgentEscrowNative | [`0x936083B0...DdFd3`](https://testnet.arcscan.app/address/0x936083B0cA386f74E60405B551418f78247DdFd3) | Single job escrow |
+| AgentPipelineNative | [`0x3C789996...A0eb`](https://testnet.arcscan.app/address/0x3C789996743e456C73ab1110ab1A36E11deBA0eb) | Multi-step pipeline |
+
+### On-chain proof: Single Job Flow
 
 | Step | Transaction | Description |
 |------|-------------|-------------|
-| Deploy | [`0x7cf778d6...`](https://testnet.arcscan.app/tx/0x7cf778d6395d868ab52d441dbaedfdd64fec452d6ae3e98a813eb1abf7f63c65) | AgentEscrowNative contract deployment |
+| Deploy | [`0x7cf778d6...`](https://testnet.arcscan.app/tx/0x7cf778d6395d868ab52d441dbaedfdd64fec452d6ae3e98a813eb1abf7f63c65) | AgentEscrowNative deployment |
 | Job #0 Create | [`0xe97eb001...`](https://testnet.arcscan.app/tx/0xe97eb00147ff655457d2dd705b75a0ccc774487218ad2fc3fb959588aaf20aa3) | Client creates BTC analysis task |
 | Job #0 Fund | [`0x5aca2dfe...`](https://testnet.arcscan.app/tx/0x5aca2dfe559f9d9b1bfb5de9dcd9775d4839d380f52edde4daefffa3c8efecea) | 1 USDC deposited into escrow |
-| Job #0 Submit | [`0x929bf8c3...`](https://testnet.arcscan.app/tx/0x929bf8c35f6738fcdab209c837e95804f670a7b8f3b16cad982dbd02eef108fb) | Worker submits analysis deliverable |
-| Job #0 Complete | [`0xece6dfa8...`](https://testnet.arcscan.app/tx/0xece6dfa80b1060d86e49ae96ae58d551d47033a080722a5739417baec2ab5811) | Evaluator approves → 1 USDC paid to worker |
-| Job #1 Create | [`0x5d802f95...`](https://testnet.arcscan.app/tx/0x5d802f953d7923f66f0285aa591fc6db93541521ac59ea59feb77c11373b79bf) | Autonomous agent creates task |
-| Job #1 Submit | [`0xf608888e...`](https://testnet.arcscan.app/tx/0xf608888e835feb4bb306e40a09054b702724c0967e8e795398cba423cc5c48b6) | Worker auto-detects and submits |
-| Job #1 Complete | [`0xdd1543ac...`](https://testnet.arcscan.app/tx/0xdd1543acc6482e7ffcbdee9306d53a049fe40a97443898a2892f913af743b2e4) | Evaluator auto-approves (score 90/100) |
+| Job #0 Submit | [`0x929bf8c3...`](https://testnet.arcscan.app/tx/0x929bf8c35f6738fcdab209c837e95804f670a7b8f3b16cad982dbd02eef108fb) | Worker submits deliverable |
+| Job #0 Complete | [`0xece6dfa8...`](https://testnet.arcscan.app/tx/0xece6dfa80b1060d86e49ae96ae58d551d47033a080722a5739417baec2ab5811) | Evaluator approves → 1 USDC paid |
+| Job #1 (Auto) | [`0x5d802f95...`](https://testnet.arcscan.app/tx/0x5d802f953d7923f66f0285aa591fc6db93541521ac59ea59feb77c11373b79bf) | Fully autonomous: create → submit → complete |
+
+### On-chain proof: Multi-Step Pipeline
+
+Pipeline #0 — "BTC Analysis Pipeline" (3 steps, 2.2 USDC total)
+
+| Step | Transaction | Description |
+|------|-------------|-------------|
+| Deploy | [`0x68eb5839...`](https://testnet.arcscan.app/tx/0x68eb58391324c2f6bbef1759864f1374437ae09eef867235048bbb4cabd43ea9) | AgentPipelineNative deployment |
+| Create Pipeline | [`0xef027aac...`](https://testnet.arcscan.app/tx/0xef027aacc0192c9461216b9eb28eafcf73340542ed65cc70739d335dc8cfbb19) | 3-step BTC analysis pipeline created |
+| Fund (2.2 USDC) | [`0xf22d97f0...`](https://testnet.arcscan.app/tx/0xf22d97f0425c4e07a50c64c6eff69df99089f633ec2cc34cb15c0fa4927b0b36) | Budget locked, Step 0 activated |
+| Step 1 Submit | [`0xfad809a2...`](https://testnet.arcscan.app/tx/0xfad809a2767bde17cb41265785adb3cd50e30ba14b5c8255da20ca89538d2bb7) | OHLCV data + RSI/MACD/BB computed |
+| Step 1 Approved | [`0x9f4931d8...`](https://testnet.arcscan.app/tx/0x9f4931d81caa46a563c2d2559e675b97d007c812c9724cec81baa03504037cec) | +0.55 USDC → Worker |
+| Step 2 Submit | [`0xb0493b17...`](https://testnet.arcscan.app/tx/0xb0493b17a25ffc03149f5d6d10af873e69412d7e77dd093dc62e7058b057ae7a) | Support/resistance levels identified |
+| Step 2 Approved | [`0x9c4840a4...`](https://testnet.arcscan.app/tx/0x9c4840a4ca92f1ec7869628d2ea0379f24083a7b1e69f6d944ad7ab0712da614) | +0.55 USDC → Worker |
+| Step 3 Submit | [`0xb02bd79f...`](https://testnet.arcscan.app/tx/0xb02bd79fc29085396ecfa314427dee28bfb13f4b34d8bea549e5c212fb98cae9) | Trade recommendation generated |
+| Step 3 Approved | [`0xeea10451...`](https://testnet.arcscan.app/tx/0xeea10451d4e55ebf32425a54d9ce5fdf2d7b24122bc6eb4ce6c6c75506207770) | +1.10 USDC → Worker. Pipeline COMPLETE |
 
 ### Agent wallets
 
@@ -61,34 +101,15 @@ Contract deployed and verified with real transactions on Arc testnet (chain ID `
 ```bash
 npm install
 npm run compile
-npm run demo:full   # runs all 3 agent bots E2E on local Hardhat network
+
+# Single job demo (local)
+npm run demo:full
+
+# Multi-step pipeline (Arc testnet)
+npm run pipeline:run
 ```
 
-### Autonomous agent mode
-
-Agents watch the chain and react automatically — no human intervention:
-
-```bash
-# Run all 3 agents autonomously (polls Arc testnet every 3-4s)
-npx tsx scripts/agents/run-all.ts
-```
-
-Or run each agent in a separate terminal:
-
-```bash
-npx tsx scripts/agents/worker-watcher.ts      # auto-picks up funded jobs
-npx tsx scripts/agents/evaluator-watcher.ts   # auto-evaluates submissions
-```
-
-### Agent bots
-
-| Bot | Role | Manual | Autonomous |
-|-----|------|--------|------------|
-| **Client** | Creates jobs, funds with USDC | `client-bot.ts` | `run-all.ts` |
-| **Worker** | Detects jobs, performs analysis, submits | `worker-bot.ts` | `worker-watcher.ts` |
-| **Evaluator** | AI evaluates quality, approves/rejects | `evaluator-bot.ts` | `evaluator-watcher.ts` |
-
-### Deploy to Arc testnet
+### Run on Arc testnet
 
 ```bash
 # 1. Generate agent wallets
@@ -96,47 +117,70 @@ npm run wallets
 
 # 2. Configure
 cp .env.example .env
-# fill in private keys, ANTHROPIC_API_KEY (optional)
+# Fill in private keys, ANTHROPIC_API_KEY (optional)
 
-# 3. Fund wallets at https://faucet.circle.com (Arc Testnet, 20 USDC each)
+# 3. Fund wallets at https://faucet.circle.com (Arc Testnet)
 
-# 4. Deploy
-npx tsx scripts/deploy-arc.ts
+# 4. Deploy contracts
+npm run deploy:arc        # single escrow
+npm run deploy:pipeline   # multi-step pipeline
 
-# 5. Set ESCROW_ADDRESS in .env, then run agents
-npx tsx scripts/agents/run-all.ts
+# 5. Run agents
+npx tsx scripts/agents/run-all.ts           # single job mode
+npx tsx scripts/agents/pipeline-run-all.ts  # pipeline mode
 ```
+
+### Agent bots
+
+| Bot | Single Job | Pipeline |
+|-----|-----------|----------|
+| **Client** | `client-bot.ts` | `pipeline-client.ts` |
+| **Worker** | `worker-watcher.ts` | `pipeline-worker.ts` |
+| **Evaluator** | `evaluator-watcher.ts` | `pipeline-evaluator.ts` |
+| **All-in-one** | `run-all.ts` | `pipeline-run-all.ts` |
 
 ### Web dashboard
 
-Live dashboard at **[arc-agent-pay.vercel.app](https://arc-agent-pay.vercel.app)**:
-- Real-time agent balances
-- Job listing with status tracking
-- Live event log (polls every 5s)
-- MetaMask integration for creating jobs
+**[arc-agent-pay.vercel.app](https://arc-agent-pay.vercel.app)**
 
-```bash
-npx serve web   # or visit the Vercel deployment
-```
+- Pipeline visualization (step-by-step progress)
+- Real-time agent balances
+- Live on-chain event feed
+- Job listing with status tracking
 
 ## Contracts
 
-- **AgentEscrowNative.sol** — ERC-8183 escrow for Arc (native USDC via `msg.value`)
-- **AgentEscrow.sol** — ERC-20 variant for standard EVM chains
-- **MockUSDC.sol** — test token for local development
+| Contract | Purpose | Key Feature |
+|----------|---------|-------------|
+| **AgentEscrowNative.sol** | Single job escrow | ERC-8183, native USDC via `msg.value` |
+| **AgentPipelineNative.sol** | Multi-step pipeline | Step chaining, gas compensation, partial refund |
+| **AgentEscrow.sol** | ERC-20 variant | For standard EVM chains |
+| **MockUSDC.sol** | Test token | Local development |
+
+### Pipeline features
+
+- **Step chaining**: Each step's deliverable becomes the next step's input
+- **Gas compensation**: Workers receive reward + gas fee per step (USDC = gas on Arc)
+- **Partial failure**: If step N fails, steps N..end budget is refunded to client
+- **Expiry protection**: Anyone can trigger refund after deadline
 
 ## Tech stack
 
-- Solidity 0.8.24 + OpenZeppelin (ReentrancyGuard, SafeERC20)
-- Hardhat v3
+- Solidity 0.8.24 + OpenZeppelin (ReentrancyGuard)
+- Hardhat v3 (viaIR, Solidity tests with forge-std)
 - Arc Chain (EVM L1, USDC native gas, chain ID 5042002)
 - ethers.js v6
 - Claude API (Anthropic SDK) for AI evaluation
 - Vercel for dashboard hosting
 
-## Arc Chain
+## Why Arc?
 
-Arc is an open Layer-1 blockchain by Circle, purpose-built for programmable money. USDC is the native gas token with sub-second deterministic finality. Currently **testnet only**.
+Arc is Circle's L1 blockchain where **USDC is the native gas token**. This means:
+- No ETH needed — agents pay gas in the same token they earn
+- Sub-second deterministic finality
+- Gas compensation is trivial (just add USDC to the payout)
+
+This makes it ideal for micro-payment agent economies where gas costs matter.
 
 - [Arc docs](https://docs.arc.io)
 - [ERC-8183 spec](https://eips.ethereum.org/EIPS/eip-8183)
